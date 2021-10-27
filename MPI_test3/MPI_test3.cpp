@@ -1,4 +1,4 @@
-﻿//подключаем три библиотеки
+//подключаем три библиотеки
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
@@ -6,11 +6,11 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#define N 10
+#define N 10000
 
 using namespace std;
 
-const int arr_size = 1000;
+const int arr_size = 10000;
 
 void num_file()
 {
@@ -62,34 +62,23 @@ int main(int argc, char** argv)
 	// Считаем матрицу из файла
 	if (rank == 0)
 	{
-		ifstream in("numbers100.txt");
+		ifstream in("numbers1.txt");
 		for (int i = 0; i < arr_size; i++)
 			for (int j = 0; j < arr_size; j++)
 				in >> arr1[i*arr_size + j];
 		in.close();
 		
 		ifstream in2;
-		in2.open("numbers200.txt");
+		in2.open("numbers2.txt");
 		for (int i = 0; i < arr_size; i++)
 			for (int j = 0; j < arr_size; j++)
 				in2 >> arr2[i*arr_size+j];
 		in2.close();
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (rank == 0)
-	{
-		for (int i = 1; i < size; i++)
-		{
-			MPI_Send(&arr1[0], arr_size * arr_size, MPI_DOUBLE, i, 77, MPI_COMM_WORLD);
-			MPI_Send(&arr2[0], arr_size * arr_size, MPI_DOUBLE, i, 55, MPI_COMM_WORLD);
-		}
-	}
-	else
-	{
-		MPI_Recv(&arr1[0], arr_size * arr_size, MPI_DOUBLE, 0, 77, MPI_COMM_WORLD, &status);
-		MPI_Recv(&arr2[0], arr_size * arr_size, MPI_DOUBLE, 0, 55, MPI_COMM_WORLD, &status);
-	}
-	//MPI_Barrier(MPI_COMM_WORLD);
+	
+	MPI_Bcast(&arr1[0], arr_size * arr_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&arr2[0], arr_size * arr_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	
 	int k = arr_size / size;
 	int start = rank * k; // если 1 процесс то стартовая позиция = 25
 	int stop = (rank + 1) * k;
@@ -104,24 +93,18 @@ int main(int argc, char** argv)
 			S += arr1[i*arr_size + j] * arr1[i*arr_size + j];
 		}
 	}
-	//MPI_Barrier(MPI_COMM_WORLD);
+	
 	double total = 0;
 
+	MPI_Reduce(&S, &total, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&S, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	if (rank == 0)
 	{
-		total = S;
-		for (int i = 1; i < size; i++)
-		{
-			MPI_Recv(&S, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-			total += S;
-		}
 		total = sqrt(total);
 		printf("E = %f\n", total);
-		//printf("E = %f\n", total);
 	}
-	else MPI_Send(&S, 1, MPI_DOUBLE, 0, 77, MPI_COMM_WORLD);
-	//cout << S << endl << endl;
-	//MPI_Barrier(MPI_COMM_WORLD);
+	
+	MPI_Barrier(MPI_COMM_WORLD);
 	double* arr3 = new double[arr_size*arr_size];
 
 	for (int i = start; i < stop; ++i)
